@@ -17,14 +17,14 @@ pipeline {
                 // Run Maven on a Unix agent.
         stage('Build') {
             steps {
-                sh "mvn -Dmaven.test.failure.ignore=true -f api-gateway clean package"
+                sh "mvn -Dmaven.test.failure.ignore=true -f discovery-server clean package"
             }
             post {
                 // If Maven was able to run the tests, even if some of the test
                 // failed, record the test results and archive the jar file.
                 success {
                     junit 'api-gateway/target/surefire-reports/TEST-*.xml'
-                    archiveArtifacts 'api-gateway/target/*.jar'
+                    archiveArtifacts 'discovery-server/target/*.jar'
                 }
             }
         }
