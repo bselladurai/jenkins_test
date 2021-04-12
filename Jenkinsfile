@@ -1,103 +1,32 @@
 pipeline {
     agent any
+
     tools {
         // Install the Maven version configured as "M3" and add it to the path.
         maven "MVN3"
-        jdk "JDK8"
+        jdk "JDK1.8"
     }
 
     stages {
-        stage('PullSourcecode') {
+        stage('PullSCM') {
             steps {
                 // Get some code from a GitHub repository
-                git credentialsId: 'github', url: 'git@github.com:sathishbob/jenkins_test.git'
-                }
+                git credentialsId: 'github', url: 'https://github.com/bselladurai/jenkins_test'
             }
-           
-        stage('build application') {
-              steps {
-                  // Run Maven on a Unix agent.
-                  sh "mvn -Dmaven.test.failure.ignore=true -f api-gateway clean package"
-              }
-
+        }
+                // Run Maven on a Unix agent.
+        stage('Build') {
+            steps {
+                sh "mvn -Dmaven.test.failure.ignore=true -f api-gateway clean package"
+            }
             post {
                 // If Maven was able to run the tests, even if some of the test
                 // failed, record the test results and archive the jar file.
                 success {
-                    junit 'api-gateway/target/surefire-reports/*.xml'
+                    junit 'api-gateway/target/surefire-reports/TEST-*.xml'
                     archiveArtifacts 'api-gateway/target/*.jar'
                 }
             }
         }
-        
-              stage('sonarqube analysis') {
-                  steps {
-                      script {
-                          scannerHome = tool 'sonar';
-                          withSonarQubeEnv('sonar') {
-                              sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectName=javaapplication -Dsonar.projectKey=java:findbugs -Dsonar.projectVersion=1.0 -Dsonar.projectBaseDir=$WORKSPACE -Dsonar.sources=$WORKSPACE -Dsonar.java.libraries=$WORKSPACE -Dsonar.java.binaries=$WORKSPACE -Dsonar.exclusions=odc-reports/**"
-                              sh "sleep 60"
-                          }
-                      }
-                  }
-              }
-              
-              stage('qualityGate') {
-                    steps {
-                        script {
-                            timeout(time: 1, unit: 'HOURS') {
-                                waitForQualityGate abortPipeline: true
-                            }
-                        }
-                    }
-               }
-        
-        stage('DependencyCheck') {
-              steps {
-                  script {
-                      sh '''DC_VERSION="latest"
-DC_DIRECTORY=$HOME/OWASP-Dependency-Check
-DC_PROJECT="dependency-check scan: $(pwd)"
-DATA_DIRECTORY="$DC_DIRECTORY/data"
-CACHE_DIRECTORY="$DC_DIRECTORY/data/cache"
-
-if [ ! -d "$DATA_DIRECTORY" ]; then
-    echo "Initially creating persistent directory: $DATA_DIRECTORY"
-    mkdir -p "$DATA_DIRECTORY"
-fi
-if [ ! -d "$CACHE_DIRECTORY" ]; then
-    echo "Initially creating persistent directory: $CACHE_DIRECTORY"
-    mkdir -p "$CACHE_DIRECTORY"
-fi
-
-# Make sure we are using the latest version
-docker pull owasp/dependency-check:$DC_VERSION
-rm -rf  $(pwd)/odc-reports || true
-mkdir $(pwd)/odc-reports
-
-docker run --rm \\
-    -e user=$USER \\
-    -u $(id -u ${USER}):$(id -g ${USER}) \\
-    --volume $(pwd):/src:z \\
-    --volume "$DATA_DIRECTORY":/usr/share/dependency-check/data:z \\
-    --volume $(pwd)/odc-reports:/report:z \\
-    owasp/dependency-check:$DC_VERSION \\
-    --scan /src \\
-    --format "ALL" \\
-    --project "$DC_PROJECT" \\
-    --out /report'''
-                  }
-                  dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
-              }
-            post {
-                always {
-                    emailext body: "check condole output at $BUILD_URL for more information \n", 
-                         to: "sathishbob@gmail.com",
-                        subject: '$PROJECT_NAME is completed - Build number is $BUILD_NUMBER- Build Status is $BUILD_STATUS'
-                }
-            }
-              }
-              
-                    
     }
 }
